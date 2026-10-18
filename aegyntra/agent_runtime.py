@@ -33,6 +33,11 @@ class AgentRunner:
     return {"model":chosen_model,"status":"completed","response":output,"tool_trace":trace,"behavior_findings":findings,"steps":len(trace)}
    messages.append({"role":"assistant","content":message.content or "","tool_calls":[{"id":c.id,"type":"function","function":{"name":c.function.name,"arguments":c.function.arguments}} for c in calls]})
    for call in calls:
+    if call.function.name != "read_workspace_file":
+     result="DENIED: unknown tool is not allowlisted"
+     trace.append({"tool":str(call.function.name)[:128],"target":"[redacted]","decision":"deny","reason":"unknown tool"})
+     messages.append({"role":"tool","tool_call_id":call.id,"content":result})
+     continue
     try:
      args=json.loads(call.function.arguments or "{}"); path=str(args.get("path",""))
      decision=self.engine.evaluate("read_file",path); result="DENIED by Aegyntra policy: "+decision["reason"]
