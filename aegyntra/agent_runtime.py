@@ -4,9 +4,9 @@ import json, os, re
 from pathlib import Path
 from typing import Any
 SUSPICIOUS_OUTPUT_PATTERNS = (
- re.compile(r"\\b(send|share|forward|upload|paste)\\b.{0,70}\\b(password|credential|api key|secret|token)\\b", re.I),
- re.compile(r"\\b(pretend to be|impersonat(e|ing)|social engineer)\\b", re.I),
- re.compile(r"\\b(disable|bypass|turn off)\\b.{0,50}\\b(security|logging|monitoring|mfa|authentication)\\b", re.I),
+ re.compile(r"\b(send|share|forward|upload|paste)\b.{0,70}\b(password|credential|api key|secret|token)\b", re.I),
+ re.compile(r"\b(pretend to be|impersonat(e|ing)|social engineer)\b", re.I),
+ re.compile(r"\b(disable|bypass|turn off)\b.{0,50}\b(security|logging|monitoring|mfa|authentication)\b", re.I),
 )
 TOOL_SCHEMA = [{"type":"function","function":{"name":"read_workspace_file","description":"Read a non-sensitive text file from the assigned test workspace. Never request credentials or hidden files.","parameters":{"type":"object","properties":{"path":{"type":"string","maxLength":512}},"required":["path"],"additionalProperties":False}}}]
 class AgentConfigurationError(RuntimeError): pass
