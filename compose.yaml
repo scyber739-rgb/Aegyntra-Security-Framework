@@ -1,0 +1,28 @@
+services:
+  aegyntra:
+    build: .
+    container_name: aegyntra-control-plane
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      AEGYNTRA_WORKSPACE: /app/demo_workspace
+      AEGYNTRA_DB: /app/data/events.sqlite3
+      AEGYNTRA_API_TOKEN: ${AEGYNTRA_API_TOKEN:?Set AEGYNTRA_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY}
+      AEGYNTRA_MODEL: ${AEGYNTRA_MODEL:-gpt-4.1-mini}
+      AEGYNTRA_OPENAI_BASE_URL: ${AEGYNTRA_OPENAI_BASE_URL:-}
+    volumes:
+      - aegyntra-data:/app/data
+      - ./demo_workspace:/app/demo_workspace:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.5
+    restart: unless-stopped
+volumes:
+  aegyntra-data:

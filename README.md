@@ -1,49 +1,70 @@
-# Aegyntra
+# Aegyntra — AI Agent Security Platform
 
 **Autonomous AI Agent Security and Credential Protection Framework**
 
-Aegyntra is an educational security research prototype for evaluating *proposed* AI agent actions **before execution**. This starter implementation provides a fail-closed policy engine, decoy-credential alerts, SQLite audit events, and a local FastAPI demonstration API.
+Aegyntra is an evolving security research platform for running controlled evaluations against a real provider-backed AI model while mediating a deliberately limited tool surface. It records policy decisions and provides a professional local dashboard for agent evaluation, event review, and heuristic behavior findings.
 
-> **Security status:** v0.1 is a policy simulator, **not** a secure agent sandbox, credential vault, real HTTP proxy, host monitor, or production-grade enforcement system. It cannot stop agents that bypass the gateway. Never use real credentials in demonstrations.
+> **Important status:** v0.2 is a real-provider evaluation platform, not a production security product. It mediates only tool calls routed through its adapter. It is not a secure VM/container, universal agent interceptor, credential vault, host EDR, tamper-proof SIEM, or network firewall. Use synthetic data in an isolated lab. Never use real credentials in test prompts or files.
 
-## Quick start
+## Features in this branch
+- Real OpenAI-compatible Chat Completions model calls with tool calling.
+- A narrow workspace-file tool; proposed reads pass through the policy engine before adapter execution.
+- Default-deny behavior for unsupported actions and unapproved paths.
+- SQLite policy event records and synthetic decoy credential alerts.
+- Local dashboard with event stream, decision counts, severity indicators, and a real-agent evaluation form.
+- Request schema bounds, optional API token auth, bounded tool rounds, and sanitized provider errors.
+- Docker Compose hardening defaults: non-root process, read-only root filesystem, dropped capabilities, no-new-privileges, resource limits, loopback-only host port.
+- Threat model and real-agent test guide.
 
-Python 3.10+ required.
+## Run locally
+Python 3.10+ required:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows PowerShell: .venv\\Scripts\\Activate.ps1
-pip install -e '.[test]'
-python -m aegyntra.demo
-pytest -q
+source .venv/bin/activate  # Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install -e '.[test,agent]'
+mkdir -p demo_workspace
+printf 'Aegyntra lab notes; no secrets here.\\n' > demo_workspace/lab-notes.txt
+export OPENAI_API_KEY='your-provider-key'
+export AEGYNTRA_MODEL='gpt-4.1-mini'
+export AEGYNTRA_API_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+uvicorn aegyntra.platform:app --host 127.0.0.1 --port 8000
 ```
 
-Run the local API (only on loopback):
+Open **http://127.0.0.1:8000**. Paste the configured Aegyntra API token into the dashboard if enabled. Keep the provider key only in the server environment; do not put it in browser code, prompts, or the repository.
+
+Run tests:
 
 ```bash
-uvicorn aegyntra.api:app --host 127.0.0.1 --port 8000
-curl -X POST http://127.0.0.1:8000/evaluate -H 'Content-Type: application/json' -d '{"action":"shell","target":"whoami"}'
+pytest -v
 ```
 
-Available routes: `GET /health`, `POST /evaluate`, `GET /events`. The API **evaluates** actions but does **not** execute them. The endpoint is unauthenticated, so do not expose it beyond loopback. Network checks are advisory only; no network requests are performed.
+Run the original offline policy demonstration:
 
-## Current features
+```bash
+python -m aegyntra.demo
+```
 
-- Allow read of ordinary files under a configured demo workspace
-- Deny traversal, missing paths, symlink escapes, hidden paths, `.key`/`.pem` files
-- Deny shell and other unsupported actions by default
-- Deny network destinations by default
-- Detect accesses to synthetic `DECOY_CREDENTIALS.txt`
-- Persist decisions and explanations to SQLite
-- Offline demo and unit tests
+## Docker Compose
 
-## Planned research roadmap
+Create a `.env` file from `.env.example`, edit it locally with your provider key and a long random Aegyntra token, and ensure `demo_workspace/` exists. Do not commit `.env`.
 
-1. Threat model and sandbox isolation (VirtualBox + separate trusted controller)
-2. Tool-call enforcement adapter with strict per-agent permissions
-3. Credential broker that never returns raw credentials to agents
-4. OS file/process telemetry, decoy correlation, audit integrity
-5. OPNsense default-deny egress and tested containment
-6. Dashboard, adversarial evaluations, prevention and false-positive metrics
+```bash
+cp .env.example .env
+mkdir -p demo_workspace
+docker compose up --build
+```
 
-See [docs/SECURITY.md](docs/SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Open http://127.0.0.1:8000. The host port is bound to loopback. Compose is a hardened starting point, not a guarantee of isolation; inspect and adapt it to your environment.
+
+## Safe evaluation scenarios
+See [docs/REAL_AGENT_TESTING.md](docs/REAL_AGENT_TESTING.md). Use synthetic documents and scripted test personas to evaluate benign behavior, prompt injection, decoy access, path escapes, credential solicitation, and repeated policy violations. Do not test manipulative prompts on unsuspecting people or connect the agent to production accounts.
+
+## Security boundaries
+- Only tools explicitly provided to the model are available through this adapter; there is no shell tool or arbitrary HTTP tool.
+- Aegyntra cannot observe or block a different SDK, process, direct socket, compromised host, or agent that bypasses the adapter.
+- Heuristic output findings are indicators, not proof of malicious intent; measure false positives and false negatives.
+- Current SQLite evidence is local and mutable. Host telemetry, cryptographic evidence chaining, credential brokerage, universal integrations, and OPNsense containment remain future engineering milestones.
+- Keep the control plane outside the agent VM/container trust boundary. Disable shared folders, clipboard, and drag/drop for an adversarial VM; enforce default-deny egress outside this application.
+
+Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) and [docs/SECURITY.md](docs/SECURITY.md) before running adversarial tests.
