@@ -1,12 +1,11 @@
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
-RUN groupadd --system aegyntra && useradd --system --gid aegyntra --home-dir /nonexistent aegyntra
+RUN addgroup --system aegyntra && adduser --system --ingroup aegyntra aegyntra
 COPY pyproject.toml README.md ./
 COPY aegyntra ./aegyntra
 COPY dashboard ./dashboard
-RUN pip install --no-cache-dir ".[agent]" && mkdir -p /app/demo_workspace /app/data && chown -R aegyntra:aegyntra /app
+RUN pip install --no-cache-dir . && mkdir -p /app/data && chown -R aegyntra:aegyntra /app
 USER aegyntra
-EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
-CMD ["uvicorn","aegyntra.platform:app","--host","0.0.0.0","--port","8000"]
+EXPOSE 8010
+CMD ["uvicorn","aegyntra.platform:app","--host","0.0.0.0","--port","8010"]

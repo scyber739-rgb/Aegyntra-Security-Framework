@@ -1,0 +1,23 @@
+services:
+  aegyntra:
+    build: .
+    container_name: aegyntra-control-plane
+    env_file: .env
+    environment:
+      AEGYNTRA_DATA_DIR: /app/data
+      AEGYNTRA_MAX_UPLOAD_MB: "15"
+    ports:
+      - "127.0.0.1:8010:8010"
+    volumes:
+      - aegyntra_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.5
+    restart: unless-stopped
+volumes:
+  aegyntra_data:
