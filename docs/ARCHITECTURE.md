@@ -1,18 +1,5 @@
-# Aegyntra proposed architecture
+# Aegyntra v1.0 architecture
 
-```mermaid
-flowchart TD
-  U[User task] --> A[Integrated AI agent]
-  A --> G[Pre-execution policy gateway]
-  G -->|Approved tool call| S[Restricted agent sandbox]
-  G -->|Denied| L[Audit events]
-  S --> M[Runtime file/process/network sensors]
-  M --> C[Trusted event correlation engine]
-  C --> L
-  C --> F[OPNsense containment controller]
-  L --> D[Security dashboard]
-```
+Implemented: authenticated local FastAPI control plane; SQLite agents, Vaults, file inventory, requests, events, policies and incidents; default-deny mediated action evaluation; user-selected file import; input/output/quarantine/evidence spaces; file requests with manual import required; hash-linked audit verification; dashboard and external telemetry ingestion.
 
-**v0.1 implemented:** policy checks, event logging, decoy signals, simulation API and tests.
-
-**Future:** actual agent adapter, credential broker, sandbox OS enforcement, firewall integration, telemetry correlation and dashboard. Tool calls cannot reveal private model reasoning; pre-execution control requires mediation of the real execution path.
+Not implemented: universal agent interception, native OpenClaw adapter, Windows ETW/file minifilter/WFP sensor, host firewall control, VM/container launcher, malware scanner or sandbox escape protection. Vault folders are storage separation, not safe code execution isolation. Use a patched disposable VM for untrusted agents. Hash-linked logs are tamper-evident, not tamper-proof against privileged attackers.

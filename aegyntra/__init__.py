@@ -1,1 +1,2 @@
-"""Aegyntra research prototype. Not a sandbox or production security boundary."""
+"""Aegyntra local-first AI agent security framework."""
+__version__ = "1.0.0"
