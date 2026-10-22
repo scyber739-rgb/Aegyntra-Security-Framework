@@ -116,7 +116,7 @@ def runtime_status(vid:str):
  try:svc.check(vid)
  except Exception as e:fail(e)
  with db.lock:r=db.db.execute("SELECT * FROM vault_runtime WHERE vault_id=?",(vid,)).fetchone()
- if not r:return {"vault_id":vid,"state":"not_paired","agent_running":False,"isolated":False,"verified":False}
+ if not r:return {"vault_id":vid,"state":"not_paired","agent_running":False,"isolated":False,"verified":False,"message":"No paired runtime heartbeat exists for this Vault."}
  heartbeat=r["last_heartbeat"]; fresh=False
  if heartbeat:
   try:fresh=datetime.now(timezone.utc)-datetime.fromisoformat(heartbeat)<timedelta(seconds=60)
