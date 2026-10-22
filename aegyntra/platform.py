@@ -90,13 +90,15 @@ def runtime_pair(x:PairIn):
   cur=db.db.execute("UPDATE runtime_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL AND expires_at >= ?",(t,row["code_hash"],t))
   if cur.rowcount != 1:raise HTTPException(401,"Access code was already used or expired")
   db.db.execute("INSERT INTO runtime_tokens VALUES(?,?,?,?,?)",(token_hash(runtime_token),row["vault_id"],row["agent_id"],t,None))
-  db.db.execute("INSERT INTO vault_runtime VALUES(?,?,?,?,?,?) ON CONFLICT(vault_id) DO UPDATE SET agent_id=excluded.agent_id,state='paired',container_name=excluded.container_name,last_heartbeat=excluded.last_heartbeat,updated_at=excluded.updated_at",(row["vault_id"],row["agent_id"],"paired","agent-runtime",t,t))
+  db.db.execute("INSERT INTO vault_runtime VALUES(?,?,?,?,?,?) ON CONFLICT(vault_id) DO UPDATE SET agent_id=excluded.agent_id,state='paired',container_name=excluded.container_name,last_heartbeat=excluded.last_heartbeat,updated_at=excluded.updated_at",(row["vault_id"],row["agent_id"],"paired","agent-runtime",None,t))
  db.event(agent_id=row["agent_id"],action="vault.agent.paired",target=row["vault_id"],decision="allow",reason="runtime paired using single-use code",source="runtime-control",details={"vault_id":row["vault_id"]})
  return {"runtime_token":runtime_token,"vault_id":row["vault_id"],"agent_id":row["agent_id"],"api_base":"/api/v1/runtime"}
 @app.post("/api/v1/runtime/heartbeat")
 def runtime_heartbeat(x:RuntimeEventIn,rt=Depends(runtime_auth)):
  t=datetime.now(timezone.utc).isoformat()
- with db.lock,db.db:db.db.execute("UPDATE vault_runtime SET state='running',last_heartbeat=?,updated_at=? WHERE vault_id=?",(t,t,rt["vault_id"]))
+ with db.lock,db.db:
+  db.db.execute("UPDATE vault_runtime SET state='running',last_heartbeat=?,updated_at=? WHERE vault_id=?",(t,t,rt["vault_id"]))
+  db.db.execute("UPDATE agents SET last_seen=? WHERE id=?",(t,rt["agent_id"]))
  db.event(agent_id=rt["agent_id"],action="runtime.heartbeat",target=rt["vault_id"],decision="allow",reason="agent runtime heartbeat",source="runtime-agent",details={"vault_id":rt["vault_id"]})
  return {"ok":True,"state":"running","time":t}
 @app.post("/api/v1/runtime/evaluate")
@@ -119,7 +121,7 @@ def runtime_status(vid:str):
  if heartbeat:
   try:fresh=datetime.now(timezone.utc)-datetime.fromisoformat(heartbeat)<timedelta(seconds=60)
   except ValueError:pass
- return {"vault_id":vid,"agent_id":r["agent_id"],"state":"running" if fresh else "stale","agent_running":fresh,"isolated":False,"verified":False,"container_name":r["container_name"],"last_heartbeat":heartbeat,"message":"Agent heartbeat observed. Container isolation is not verified by this control plane."}
+ return {"vault_id":vid,"agent_id":r["agent_id"],"state":("paired" if not heartbeat else ("running" if fresh else "stale")),"agent_running":fresh,"isolated":False,"verified":False,"container_name":r["container_name"],"last_heartbeat":heartbeat,"message":"Agent heartbeat observed only when fresh. Container isolation is not verified by this control plane."}
 @app.get("/api/v1/vaults/{vid}/files",dependencies=[Depends(auth)])
 def files(vid:str):
  try:return svc.files(vid)
