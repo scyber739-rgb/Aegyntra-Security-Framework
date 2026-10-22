@@ -21,6 +21,7 @@ class DecisionIn(BaseModel): approved:bool
 class RuntimeCodeIn(BaseModel): agent_id:str
 class PairIn(BaseModel): code:str=Field(min_length=16,max_length=256)
 class RuntimeEventIn(BaseModel): action:str=Field(min_length=1,max_length=96); target:str=Field(default="[redacted]",max_length=512); decision:str=Field(default="observe",max_length=32); reason:str=Field(default="",max_length=500); severity:Literal["info","low","medium","high","critical"]="info"; details:dict=Field(default_factory=dict)
+class RuntimeEvalIn(BaseModel): action:str=Field(min_length=1,max_length=96); target:str=Field(min_length=1,max_length=512); space:Literal["input","output","quarantine","evidence"]="input"
 def auth(x_aegyntra_token:str|None=Header(default=None)):
  if not x_aegyntra_token or not hmac.compare_digest(x_aegyntra_token,API_TOKEN):raise HTTPException(401,"Unauthorized")
 def token_hash(value:str)->str:return hashlib.sha256(value.encode()).hexdigest()
@@ -97,6 +98,11 @@ def runtime_heartbeat(x:RuntimeEventIn,rt=Depends(runtime_auth)):
  with db.lock,db.db:db.db.execute("UPDATE vault_runtime SET state='running',last_heartbeat=?,updated_at=? WHERE vault_id=?",(t,t,rt["vault_id"]))
  db.event(agent_id=rt["agent_id"],action="runtime.heartbeat",target=rt["vault_id"],decision="allow",reason="agent runtime heartbeat",source="runtime-agent",details={"vault_id":rt["vault_id"]})
  return {"ok":True,"state":"running","time":t}
+@app.post("/api/v1/runtime/evaluate")
+def runtime_evaluate(x:RuntimeEvalIn,rt=Depends(runtime_auth)):
+ d=evaluate(x.action,x.target,x.space)
+ db.event(agent_id=rt["agent_id"],action=x.action,target=x.target,decision=d["decision"],reason=d["reason"],severity=d["severity"],source="runtime-policy",details={"vault_id":rt["vault_id"],"space":x.space,"enforcement":"decision-only; actual operations must use the mediated runner"})
+ return d
 @app.post("/api/v1/runtime/events")
 def runtime_event(x:RuntimeEventIn,rt=Depends(runtime_auth)):
  details=dict(x.details); details["vault_id"]=rt["vault_id"]
