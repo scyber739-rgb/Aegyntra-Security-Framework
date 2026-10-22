@@ -157,4 +157,4 @@ python -m pip install -e '.[test]'
 python -m pytest -v
 ~~~
 
-See docs/ARCHITECTURE.md and docs/THREAT_MODEL.md for architecture and security assumptions.
+See docs/ARCHITECTURE.md for the architecture and runtime security assumptions.
