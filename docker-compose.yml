@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:8010:8010"
     volumes:
-      - aegyntra_data:/app/data
+      - ./data:/app/data
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev
@@ -20,10 +20,15 @@ services:
     cpus: 1.5
     restart: unless-stopped
     networks: [default, agent_internal]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
 
-  # Start only after generating a one-time code in the dashboard:
-  # AEGYNTRA_ACCESS_CODE='<code>' docker compose --profile agent run --rm agent-runner
-  # This is a safe deterministic test agent, not a provider-backed LLM agent.
+  # After creating a Vault and importing a safe input file, generate a pairing
+  # code in the dashboard and run the printed command. Only that Vault's input
+  # folder is bind-mounted read-only; the agent has no host Docker socket.
   agent-runner:
     profiles: ["agent"]
     build: .
@@ -31,12 +36,14 @@ services:
     command: ["python", "-m", "aegyntra.runtime_agent"]
     environment:
       AEGYNTRA_API_URL: http://aegyntra:8010
-      AEGYNTRA_ACCESS_CODE: ${AEGYNTRA_ACCESS_CODE:?Generate a one-time Vault access code in the dashboard first}
-      AEGYNTRA_WORKSPACE: /workspace
+      AEGYNTRA_ACCESS_CODE: ${AEGYNTRA_ACCESS_CODE:?Generate a one-time code in the dashboard first}
+      AEGYNTRA_VAULT_ID: ${AEGYNTRA_VAULT_ID:?Select the Vault whose input directory is mounted}
+      AEGYNTRA_WORKSPACE: /vault-input
     depends_on:
-      - aegyntra
+      aegyntra:
+        condition: service_healthy
     volumes:
-      - aegyntra_agent_workspace:/workspace
+      - ./data/vaults/${AEGYNTRA_VAULT_ID:?Create a Vault first}/input:/vault-input:ro
     read_only: true
     tmpfs:
       - /tmp:size=32m,noexec,nosuid,nodev
@@ -51,7 +58,3 @@ services:
 networks:
   agent_internal:
     internal: true
-
-volumes:
-  aegyntra_data:
-  aegyntra_agent_workspace:
