@@ -36,14 +36,14 @@ services:
     command: ["python", "-m", "aegyntra.runtime_agent"]
     environment:
       AEGYNTRA_API_URL: http://aegyntra:8010
-      AEGYNTRA_ACCESS_CODE: ${AEGYNTRA_ACCESS_CODE:?Generate a one-time code in the dashboard first}
-      AEGYNTRA_VAULT_ID: ${AEGYNTRA_VAULT_ID:?Select the Vault whose input directory is mounted}
+      AEGYNTRA_ACCESS_CODE: ${AEGYNTRA_ACCESS_CODE:-}
+      AEGYNTRA_VAULT_ID: ${AEGYNTRA_VAULT_ID:-__missing_vault_id__}
       AEGYNTRA_WORKSPACE: /vault-input
     depends_on:
       aegyntra:
         condition: service_healthy
     volumes:
-      - ./data/vaults/${AEGYNTRA_VAULT_ID:?Create a Vault first}/input:/vault-input:ro
+      - ./data/vaults/${AEGYNTRA_VAULT_ID:-__missing_vault_id__}/input:/vault-input:ro
     read_only: true
     tmpfs:
       - /tmp:size=32m,noexec,nosuid,nodev
