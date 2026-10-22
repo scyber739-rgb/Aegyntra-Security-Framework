@@ -87,7 +87,8 @@ def runtime_pair(x:PairIn):
  if row["used_at"] or row["expires_at"] < datetime.now(timezone.utc).isoformat():raise HTTPException(401,"Invalid, expired, or already-used access code")
  runtime_token=secrets.token_urlsafe(40); t=datetime.now(timezone.utc).isoformat()
  with db.lock,db.db:
-  db.db.execute("UPDATE runtime_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL",(t,row["code_hash"]))
+  cur=db.db.execute("UPDATE runtime_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL AND expires_at >= ?",(t,row["code_hash"],t))
+  if cur.rowcount != 1:raise HTTPException(401,"Access code was already used or expired")
   db.db.execute("INSERT INTO runtime_tokens VALUES(?,?,?,?,?)",(token_hash(runtime_token),row["vault_id"],row["agent_id"],t,None))
   db.db.execute("INSERT INTO vault_runtime VALUES(?,?,?,?,?,?) ON CONFLICT(vault_id) DO UPDATE SET agent_id=excluded.agent_id,state='paired',container_name=excluded.container_name,last_heartbeat=excluded.last_heartbeat,updated_at=excluded.updated_at",(row["vault_id"],row["agent_id"],"paired","agent-runtime",t,t))
  db.event(agent_id=row["agent_id"],action="vault.agent.paired",target=row["vault_id"],decision="allow",reason="runtime paired using single-use code",source="runtime-control",details={"vault_id":row["vault_id"]})
