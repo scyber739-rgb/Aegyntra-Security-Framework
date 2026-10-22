@@ -1,4 +1,4 @@
-"""Safe demo runtime: only reads a synthetic fixture and submits policy test cases.
+"""Safe demo runtime: reads a selected file from the mounted Vault input and submits policy tests.
 It never runs shell commands or makes arbitrary outbound requests.
 """
 import json, os, time, urllib.request
