@@ -38,6 +38,25 @@ def register(x:AgentIn):return svc.agent(x.name,x.kind,x.trust)
 def vaults():return svc.vaults()
 @app.post("/api/v1/vaults",dependencies=[Depends(auth)])
 def create_vault(x:VaultIn):return svc.vault(x.name,x.mode)
+
+@app.get("/api/v1/vaults/{vid}/visibility",dependencies=[Depends(auth)])
+def vault_visibility(vid:str):
+ try:svc.check(vid)
+ except Exception as e:fail(e)
+ with db.lock:
+  vault=dict(db.db.execute("SELECT * FROM vaults WHERE id=?",(vid,)).fetchone())
+  files=[dict(x) for x in db.db.execute("SELECT id,name,space,status,size FROM files WHERE vault_id=? ORDER BY created_at DESC LIMIT 100",(vid,)).fetchall()]
+  requests=[dict(x) for x in db.db.execute("SELECT id,agent_id,name,status,created_at FROM requests WHERE vault_id=? ORDER BY created_at DESC LIMIT 100",(vid,)).fetchall()]
+  events=[]
+  for row in db.db.execute("SELECT * FROM events ORDER BY rowid DESC LIMIT 500").fetchall():
+   x=db.unpack(row)
+   if x["details"].get("vault_id")==vid or (x["action"]=="vault.created" and x["target"]==vid):
+    events.append({k:x[k] for k in ("id","time","agent_id","action","target","decision","reason","severity","source")})
+ return {"vault":vault,"files":files,"requests":requests,"events":events[:100],
+  "runtime":{"state":"not_provisioned","isolated":False,"agent_running":False,"verified":False,
+  "message":"Storage only. No VM/container or agent runtime is provisioned by this release."},
+  "agent_ids_from_file_requests":list(sorted(set(r["agent_id"] for r in requests)))}
+
 @app.get("/api/v1/vaults/{vid}/files",dependencies=[Depends(auth)])
 def files(vid:str):
  try:return svc.files(vid)
