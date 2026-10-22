@@ -80,7 +80,7 @@ def create_vault_access_code(vid:str,x:RuntimeCodeIn):
  return {"vault_id":vid,"agent_id":x.agent_id,"access_code":code,"expires_at":expires,"single_use":True}
 @app.post("/api/v1/runtime/pair")
 def runtime_pair(x:PairIn):
- with db.lock,runtime_db:=db.lock:
+ with db.lock:
   row=db.db.execute("SELECT * FROM runtime_codes WHERE code_hash=?",(token_hash(x.code),)).fetchone()
  if not row:raise HTTPException(401,"Invalid, expired, or already-used access code")
  if row["used_at"] or row["expires_at"] < datetime.now(timezone.utc).isoformat():raise HTTPException(401,"Invalid, expired, or already-used access code")
