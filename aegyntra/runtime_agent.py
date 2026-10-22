@@ -1,13 +1,13 @@
 """Safe demo runtime: only reads a synthetic fixture and submits policy test cases.
 It never runs shell commands or makes arbitrary outbound requests.
 """
-import json, os, time, urllib.error, urllib.request
+import json, os, time, urllib.request
 from pathlib import Path
 
 API = os.environ.get("AEGYNTRA_API_URL", "http://aegyntra:8010").rstrip("/")
 CODE = os.environ.get("AEGYNTRA_ACCESS_CODE", "")
-WORKSPACE = Path(os.environ.get("AEGYNTRA_WORKSPACE", "/workspace")).resolve()
-INPUT = (WORKSPACE / "input").resolve()
+VAULT_ID = os.environ.get("AEGYNTRA_VAULT_ID", "")
+INPUT = Path(os.environ.get("AEGYNTRA_WORKSPACE", "/vault-input")).resolve()
 TOKEN = ""
 
 def call(path, payload=None, runtime=False):
@@ -23,12 +23,11 @@ def main():
     global TOKEN
     if not CODE:
         raise SystemExit("Set AEGYNTRA_ACCESS_CODE to the one-time Vault access code.")
-    WORKSPACE.mkdir(parents=True, exist_ok=True)
-    INPUT.mkdir(parents=True, exist_ok=True)
-    fixture = INPUT / "hello.txt"
-    if not fixture.exists():
-        fixture.write_text("Synthetic Aegyntra safe test fixture. No secrets.\n", encoding="utf-8")
+    if not VAULT_ID:
+        raise SystemExit("Set AEGYNTRA_VAULT_ID to the selected Vault ID.")
     paired = call("/api/v1/runtime/pair", {"code": CODE})
+    if paired["vault_id"] != VAULT_ID:
+        raise SystemExit("Pairing code Vault does not match the mounted Vault input. Stop and generate a new code.")
     TOKEN = paired["runtime_token"]
     print("Paired with Vault:", paired["vault_id"], flush=True)
     print("Agent ID:", paired["agent_id"], flush=True)
@@ -46,10 +45,14 @@ def main():
         try:
             result = call("/api/v1/runtime/evaluate", {"action": action, "target": target, "space": space}, runtime=True)
             if action == "read_file" and target == "hello.txt" and result["decision"] == "allow":
-                safe = (INPUT / target).resolve()
-                if safe.is_relative_to(INPUT) and safe.is_file():
-                    preview = safe.read_text(encoding="utf-8")[:120]
-                    print("READ OK:", target, "->", repr(preview), flush=True)
+                candidates = [p for p in INPUT.iterdir() if p.is_file() and p.name.startswith("fil_") and p.name[21:] == target]
+                if candidates:
+                    safe = candidates[0].resolve()
+                    if safe.is_relative_to(INPUT) and safe.is_file():
+                        preview = safe.read_text(encoding="utf-8")[:120]
+                        print("READ OK from mounted Vault input:", target, "->", repr(preview), flush=True)
+                else:
+                    print("READ SKIPPED: import a file named hello.txt into this Vault's input space first.", flush=True)
             print(result["decision"].upper(), action, target, "|", result["reason"], flush=True)
         except Exception as exc:
             print("TEST ERROR:", action, type(exc).__name__, str(exc), flush=True)
