@@ -6,10 +6,12 @@ services:
     environment:
       AEGYNTRA_DATA_DIR: /app/data
       AEGYNTRA_MAX_UPLOAD_MB: "15"
+      AEGYNTRA_OLLAMA_URL: http://ollama:11434
+      AEGYNTRA_OLLAMA_MODEL: deepseek-r1:1.5b
     ports:
       - "127.0.0.1:8010:8010"
     volumes:
-      - aegyntra_data:/app/data
+      - ./data:/app/data
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev
@@ -19,5 +21,55 @@ services:
     mem_limit: 768m
     cpus: 1.5
     restart: unless-stopped
+    networks: [default, agent_internal]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # After creating a Vault and importing a safe input file, generate a pairing
+  # code in the dashboard and run the printed command. Only that Vault's input
+  # folder is bind-mounted read-only; the agent has no host Docker socket.
+  agent-runner:
+    profiles: ["agent"]
+    build: .
+    container_name: aegyntra-demo-agent
+    command: ["python", "-m", "aegyntra.runtime_agent"]
+    environment:
+      AEGYNTRA_API_URL: http://aegyntra:8010
+      AEGYNTRA_ACCESS_CODE: ${AEGYNTRA_ACCESS_CODE:-}
+      AEGYNTRA_VAULT_ID: ${AEGYNTRA_VAULT_ID:-__missing_vault_id__}
+      AEGYNTRA_WORKSPACE: /vault-input
+    depends_on:
+      aegyntra:
+        condition: service_healthy
+    volumes:
+      - ./data/vaults/${AEGYNTRA_VAULT_ID:-__missing_vault_id__}/input:/vault-input:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    restart: "no"
+    networks: [agent_internal]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aegyntra-ollama
+    profiles: ["ai"]
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks: [default]
+    # No host port is published; only the local Compose network can reach Ollama.
+
+networks:
+  agent_internal:
+    internal: true
+
 volumes:
-  aegyntra_data:
+  ollama_data:
