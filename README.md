@@ -26,6 +26,60 @@ The repository cannot safely execute code merely because `git clone` ran; one ex
 
 **Important scope note:** this starts the existing Vault/control-plane dashboard. It does **not** yet mean an Ollama/DeepSeek LLM is deployed, arbitrary external agents are automatically sandboxed, or kernel-level file access is monitored/blocked. Those features need their own implemented and tested runtime/sensor integration; the dashboard must not display them as active until verified.
 
+## Local DeepSeek assistant (Ollama)
+
+This branch adds an optional local chat panel to the dashboard. It uses Ollama with `deepseek-r1:1.5b` by default. Ollama/model weights are free to download; they are not part of the Aegyntra image, and model use requires disk space, RAM and CPU/GPU resources. The first download requires internet. After the model is downloaded, inference can run locally without sending prompts to a hosted model API.
+
+> **Scope:** The chat model is deliberately not given shell, filesystem, network or Vault tools. A chat request/response status, model name and duration are written to the audit timeline; prompt and response text are not stored there. This chat integration is separate from the restricted deterministic demo runtime. It does not provide OS-wide agent monitoring or prove container isolation.
+
+### Start the dashboard and download the model
+
+From the WSL/Linux terminal, in the repository directory:
+
+~~~bash
+# 1. Update to the branch that contains the Local AI Assistant changes
+git fetch origin
+git switch feature/vault-visibility-phase1
+git pull --ff-only origin feature/vault-visibility-phase1
+
+# 2. Start the Aegyntra control plane (Podman)
+bash start.sh
+
+# 3. Start the optional local Ollama container
+podman compose --profile ai up -d ollama
+
+# 4. Download the small DeepSeek R1 model (internet required for this step)
+podman exec -it aegyntra-ollama ollama pull deepseek-r1:1.5b
+
+# 5. Check that the model is present
+podman exec -it aegyntra-ollama ollama list
+
+# 6. Rebuild/restart the dashboard service with the new chat endpoint
+podman compose --profile ai up --build -d aegyntra ollama
+
+# 7. Check service status and logs
+podman compose ps
+podman compose logs --tail=80 aegyntra ollama
+~~~
+
+Then open `http://127.0.0.1:8010`, enter the dashboard token printed by `bash start.sh`, select **Local AI Assistant**, send a harmless test question, and open **Activity & Logs**. The dashboard refreshes event summaries periodically. A successful chat should create `ai.chat.request` and `ai.chat.response` events; failures create `ai.chat.error` metadata.
+
+### Stop / remove the model
+
+~~~bash
+# Stop the local model service; downloaded weights remain in the named volume
+podman compose --profile ai stop ollama
+
+# Start it again later
+podman compose --profile ai up -d ollama
+
+# Remove downloaded model data only if you really want to reclaim disk space
+podman volume ls
+# Inspect the exact volume name first; remove that named volume explicitly only if desired.
+~~~
+
+Do not paste your dashboard token into chats, issues or GitHub. Do not run untrusted agents on your personal host or mount your home directory / Podman socket into an agent container.
+
 ## Implemented
 
 - Authenticated local FastAPI dashboard.
