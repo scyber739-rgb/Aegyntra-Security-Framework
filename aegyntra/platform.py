@@ -1,4 +1,4 @@
-import hmac,hashlib,secrets
+import hmac,hashlib,secrets,json,urllib.request,urllib.error,time,os
 from datetime import datetime,timezone,timedelta
 from typing import Literal
 from fastapi import Depends,FastAPI,File,Header,HTTPException,Query,UploadFile
@@ -189,3 +189,28 @@ def policies():
  return [dict(x) for x in r]
 @app.get("/api/v1/audit/verify",dependencies=[Depends(auth)])
 def audit_verify():return db.verify()
+
+
+class LocalChatIn(BaseModel):
+ message:str=Field(min_length=1,max_length=6000)
+
+@app.post("/api/v1/ai/chat",dependencies=[Depends(auth)])
+def local_ai_chat(x:LocalChatIn):
+ model=os.getenv("AEGYNTRA_OLLAMA_MODEL","deepseek-r1:1.5b")
+ base=os.getenv("AEGYNTRA_OLLAMA_URL","http://ollama:11434").rstrip("/")
+ started=time.monotonic()
+ db.event(action="ai.chat.request",target=model,decision="observe",reason="Local model request received; message text is not stored in audit logs.",source="ollama-adapter",details={"characters":len(x.message),"model":model})
+ body=json.dumps({"model":model,"messages":[{"role":"user","content":x.message}],"stream":False}).encode()
+ req=urllib.request.Request(base+"/api/chat",data=body,headers={"Content-Type":"application/json"},method="POST")
+ try:
+  with urllib.request.urlopen(req,timeout=180) as response:
+   data=json.loads(response.read().decode())
+  reply=data.get("message",{}).get("content","")
+  if not isinstance(reply,str) or not reply.strip():
+   raise ValueError("Ollama returned an empty response")
+  duration_ms=round((time.monotonic()-started)*1000)
+  db.event(action="ai.chat.response",target=model,decision="allow",reason="Local model response completed.",source="ollama-adapter",details={"model":model,"duration_ms":duration_ms,"response_characters":len(reply)})
+  return {"ok":True,"model":model,"reply":reply,"duration_ms":duration_ms,"logging":"prompt and response text are not stored in audit logs"}
+ except (urllib.error.URLError,TimeoutError,ValueError,KeyError,json.JSONDecodeError) as exc:
+  db.event(action="ai.chat.error",target=model,decision="deny",reason="Local Ollama request failed or returned invalid data.",severity="medium",source="ollama-adapter",details={"model":model,"error_type":type(exc).__name__,"duration_ms":round((time.monotonic()-started)*1000)})
+  raise HTTPException(503,"Local Ollama is unavailable or the model is not downloaded. Start the Ollama service and pull the configured model.")
