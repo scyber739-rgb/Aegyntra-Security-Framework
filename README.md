@@ -4,6 +4,28 @@ Local-first AI-agent security control plane with Vault storage, one-time runtime
 
 > **Runtime status:** This release includes a restricted, deterministic demo agent container. It can pair to one Vault, read a selected text file from that Vault's input folder (read-only mount), submit policy test cases, and report heartbeats. It does not yet run a provider-backed LLM, intercept arbitrary agent tools, or prove container isolation from inside the app. Shell/network deny events are policy simulations; those operations are never executed by the demo agent.
 
+## One-command local startup (Kali WSL / Linux + Podman)
+
+After cloning, run this **single startup command** from the repository directory:
+
+~~~bash
+bash start.sh
+~~~
+
+The script creates a private `.env` with a random dashboard token if one does not exist, builds/starts the control plane, waits for `/health`, prints the dashboard URL and token, and tries to open the browser. Open **http://127.0.0.1:8010** if the browser cannot be launched automatically. Keep `.env` private; it is git-ignored. Do not paste the token into issues or commit it.
+
+To clone and then start (requires Git, Podman, a working Podman Compose provider, and internet access to build the image):
+
+~~~bash
+git clone https://github.com/scyber739-rgb/Aegyntra-Security-Framework.git
+cd Aegyntra-Security-Framework
+bash start.sh
+~~~
+
+The repository cannot safely execute code merely because `git clone` ran; one explicit `bash start.sh` is required. The script does not overwrite an existing `.env`. It does not install Podman or bypass OS permissions. If startup fails, it prints the service status/logs instead of pretending the dashboard is ready.
+
+**Important scope note:** this starts the existing Vault/control-plane dashboard. It does **not** yet mean an Ollama/DeepSeek LLM is deployed, arbitrary external agents are automatically sandboxed, or kernel-level file access is monitored/blocked. Those features need their own implemented and tested runtime/sensor integration; the dashboard must not display them as active until verified.
+
 ## Implemented
 
 - Authenticated local FastAPI dashboard.
